@@ -1,7 +1,7 @@
 """Pass 2: render 1080x1920 shorts from the 4K source with the tracked crop + music.
 
 usage: python render.py SOURCE.mkv CLIPS.json CMD_DIR MUSIC_DIR OUT_DIR
-CMD_DIR  = output of track.py; MUSIC_DIR = output of mkmusic.py (trackA/B/C.wav)
+CMD_DIR  = output of track.py; MUSIC_DIR = output of musicgen.py (one NN_<name>.wav per clip)
 """
 import json, os, subprocess, sys
 
@@ -11,7 +11,7 @@ CW = int(SRC_H * 9 / 16) // 2 * 2
 os.makedirs(out, exist_ok=True)
 for i, c in enumerate(json.load(open(clips_json))['clips'], 1):
     d = round(c['end'] - c['start'], 3)
-    music = os.path.join(music_dir, 'track' + 'ABC'[(i - 1) % 3] + '.wav')
+    music = os.path.join(music_dir, f'{i:02d}_{c["name"]}.wav')  # from musicgen.py
     cmd_file = f'cmd{i:02d}.txt'  # relative: sendcmd paths break on Windows drive letters
     fc = (f'[0:v]sendcmd=f={cmd_file},crop={CW}:{SRC_H}:0:0,scale=1080:1920:flags=lanczos,'
           f'setsar=1,fps=60000/1001[v];[1:a]afade=t=in:d=0.5,afade=t=out:st={d-1.2}:d=1.2[a]')
