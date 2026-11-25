@@ -1,0 +1,16 @@
+{
+  "_note": "start/end are exact scene-cut timestamps from ffmpeg scene detection (threshold 0.25). end = next cut minus ~0.02s so no frame of the next scene leaks in.",
+  "scene_cuts": [1.818, 3.47, 6.34, 17.618, 48.799, 57.007, 68.619, 73.156, 98.965, 104.754, 108.558, 113.83, 128.211, 134.551, 142.843, 156.29, 177.427, 216.082, 224.741, 231.764, 264.031, 276.893, 286.053, 294.327],
+  "clips": [
+    {"name": "into-the-boulders",         "start": 6.34,    "end": 48.78},
+    {"name": "stuck-back-up",             "start": 48.799,  "end": 73.136},
+    {"name": "better-line-wheel-lift",    "start": 73.156,  "end": 98.945},
+    {"name": "crossing-the-rocks",        "start": 98.965,  "end": 128.191},
+    {"name": "two-trucks-two-lines",      "start": 128.211, "end": 156.27},
+    {"name": "endless-rocks",             "start": 156.29,  "end": 177.407},
+    {"name": "constant-attention",        "start": 177.427, "end": 216.062},
+    {"name": "stuck-and-winch-recovery",  "start": 216.082, "end": 231.744},
+    {"name": "longer-wheelbase-crossing", "start": 231.764, "end": 264.011},
+    {"name": "descending-the-boulders",   "start": 264.031, "end": 294.307}
+  ]
+}
