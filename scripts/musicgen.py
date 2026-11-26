@@ -38,6 +38,29 @@ STYLES = {
     'trailer': dict(bpm=100, mode='minor', progs=[[0, 0, 5, 6], [0, 6, 5, 6], [0, 2, 5, 4]], keys=['D', 'F#', 'A'],
                     pad_cut=1500, pad_att=0.5, bass='whole', drums='halftime', arp=None, lead=None,
                     verb=0.35, curve='build', sc=0.0, riser=True, stabs=True),
+    # --- industrial / dark electronic: pounding, distorted, mechanical ---
+    'industrial': dict(bpm=132, mode='minor', progs=[[0, 0, 5, 6], [0, 0, 0, 1], [0, 6, 5, 6]], keys=['E', 'F', 'F#'],
+                       pad_cut=700, pad_att=0.6, bass='seq16', drums='ind4', arp='mech', lead='screech',
+                       verb=0.25, curve='wave', sc=0.7, riser=True, stabs=False, ind=True),
+    'ind_heavy': dict(bpm=92, mode='minor', progs=[[0, 0, 5, 5], [0, 6, 0, 1], [0, 0, 6, 5]], keys=['D', 'C', 'E'],
+                      pad_cut=600, pad_att=1.0, bass='drone', drums='indhalf', arp='mech', lead='screech',
+                      verb=0.4, curve='build', sc=0.4, riser=True, stabs=False, ind=True),
+    # --- hard styles: fast, loud, full energy from bar 1 ---
+    'metal':   dict(bpm=160, mode='minor', progs=[[0, 0, 5, 6], [0, 1, 0, 6], [0, 0, 3, 4]], keys=['E', 'D', 'C'],
+                    pad_cut=800, pad_att=0.3, bass='pulse', drums='metal', arp=None, lead='screech', verb=0.2,
+                    curve='hard', sc=0.0, riser=True, stabs=False, ind=True, riff='chug', drive=7, rms=0.17, sat=1.8, crash=True),
+    'rock':    dict(bpm=126, mode='minor', progs=[[0, 6, 5, 6], [0, 3, 4, 0], [0, 5, 6, 4]], keys=['E', 'A', 'D'],
+                    pad_cut=1200, pad_att=0.2, bass='eighths', drums='rock', arp=None, lead='screech', verb=0.25,
+                    curve='hard', sc=0.0, riser=True, stabs=False, ind=True, riff='open', drive=3.5, rms=0.17, sat=1.7, crash=True),
+    'phonk':   dict(bpm=138, mode='minor', progs=[[0, 0, 5, 6], [0, 6, 5, 6], [0, 0, 6, 5]], keys=['F', 'G', 'E'],
+                    pad_cut=900, pad_att=0.2, bass='808', drums='phonk', arp=None, lead='cowbell', verb=0.3,
+                    curve='hard', sc=0.45, riser=True, stabs=False, ind=True, rms=0.17, sat=1.9),
+    'wobble':  dict(bpm=140, mode='minor', progs=[[0, 0, 5, 6], [0, 5, 6, 6], [0, 6, 5, 5]], keys=['F', 'F#', 'G'],
+                    pad_cut=1200, pad_att=0.2, bass='wobble', drums='dub', arp=None, lead='screech', verb=0.25,
+                    curve='hard', sc=0.6, riser=True, stabs=False, ind=True, rms=0.17, sat=1.9, crash=True),
+    'dark_techno': dict(bpm=142, mode='minor', progs=[[0, 0, 0, 5], [0, 6, 0, 6], [0, 0, 2, 1]], keys=['F#', 'G', 'D'],
+                        pad_cut=900, pad_att=0.3, bass='seq16', drums='ind4', arp='mech', lead=None,
+                        verb=0.2, curve='plateau', sc=0.75, riser=True, stabs=False, ind=True),
 }
 ORDER = list(STYLES)
 
@@ -126,6 +149,30 @@ def riser(rng, length):
     return nz * (t / length) ** 2.2 * 0.5
 
 
+def distort(x, drive): return np.tanh(x * drive) / np.tanh(drive)
+
+
+def ikick(rng):  # hard, distorted, clicky kick for industrial styles
+    t = tt(int(0.4 * SR)); f = 38 + 190 * np.exp(-t * 38)
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 8)
+    click = sos_f(rng.standard_normal(len(t)), 'high', 2500) * np.exp(-t * 300) * 0.5
+    return distort(body * 1.6 + click, 2.2) * 0.9
+
+
+def isnare(rng):  # noisy, crushed snare
+    t = tt(int(0.35 * SR)); nz = sos_f(rng.standard_normal(len(t)), 'band', [700, 7000])
+    return distort(nz * np.exp(-t * 14) * 1.5 + np.sin(2 * np.pi * 170 * t) * np.exp(-t * 20) * 0.6, 3.0) * 0.7
+
+
+def clang(rng, f0=None):  # metallic hit: inharmonic partials
+    f0 = f0 or rng.choice([180, 240, 310, 420])
+    t = tt(int(0.5 * SR)); x = np.zeros(len(t))
+    for r, g, d in ((1, 1.0, 9), (2.76, 0.7, 11), (5.4, 0.5, 14), (8.93, 0.35, 18), (13.3, 0.25, 22)):
+        x += np.sin(2 * np.pi * f0 * r * t + rng.random() * 6.28) * g * np.exp(-t * d)
+    x += sos_f(rng.standard_normal(len(t)), 'high', 4000) * np.exp(-t * 40) * 0.4
+    return distort(x * 0.5, 2.0) * 0.6
+
+
 def ep_note(f, n):  # FM electric piano
     t = tt(n); return np.sin(2 * np.pi * f * t + 1.6 * np.exp(-t * 5) * np.sin(2 * np.pi * f * t * 2)) * np.exp(-t * 2.2)
 
@@ -140,8 +187,9 @@ def curve(kind, B):
     p = np.linspace(0, 1, B)
     if kind == 'build': I = 0.15 + 0.85 * p ** 0.8
     elif kind == 'wave': I = 0.22 + 0.75 * np.abs(np.sin(1.5 * np.pi * p))
+    elif kind == 'hard': I = 0.62 + 0.38 * np.abs(np.sin(1.5 * np.pi * p + 0.3))
     else: I = np.minimum(0.8, 0.25 + 1.5 * p)
-    I[0] = min(I[0], 0.3)
+    if kind != 'hard': I[0] = min(I[0], 0.3)
     return np.clip(I, 0, 1)
 
 
@@ -171,6 +219,12 @@ def make_track(dur, style, key, seed):
     kicks = []
     one = dict(kick=kick(rng), snare=snare(rng), clap=clap(rng), hat=hat(rng), ohat=hat(rng, True),
                tom=tom(rng), tomlo=tom(rng, 70), boom=boom(rng), crash=crash(rng))
+    if S.get('ind'):
+        one['kick'], one['snare'], one['clap'] = ikick(rng), isnare(rng), distort(clap(rng), 2.5)
+        clangs = [clang(rng) for _ in range(4)]
+    # random 16-step bass pattern, repeated each bar (changes every 4 bars for variation)
+    pats = [sorted(set([0] + [s for s in range(1, 16) if rng.random() < 0.55])) for _ in range(4)]
+    offs = [[0 if rng.random() < 0.6 else int(rng.choice([7, 12, 3])) for _ in range(16)] for _ in range(4)]
 
     def chord(deg):
         c = [scale[deg], scale[deg + 2], scale[deg + 4]]
@@ -203,7 +257,32 @@ def make_track(dur, style, key, seed):
             f = hz(scale[deg] - 24)
             kind = S['bass']
             if last: kind = 'whole'
-            if kind == 'whole':
+            if kind == 'seq16':   # distorted 16-step sequenced bass
+                pat, off = pats[(b // 4) % 4], offs[(b // 4) % 4]
+                for s in pat:
+                    n = int(step_n * 1.15); fq = hz(scale[deg] - 24 + off[s])
+                    x = saw(fq, n) + 0.6 * saw(fq * 1.004, n, 0.3) + 0.5 * np.sin(2 * np.pi * fq * tt(n))
+                    x = distort(sos_f(x, 'low', 1300), 4.0) * adsr(n, 0.002, 0.03, 0.75, 0.03)
+                    pads.add(t0 + int(s * step_n), x, 0.5, 0.30)
+            elif kind == 'drone':  # sustained distorted low drone with slow pulsing
+                n = int(bar_n); x = saw(f, n) + 0.6 * saw(f * 1.005, n, 0.2) + np.sin(2 * np.pi * f * tt(n))
+                x = distort(sos_f(x, 'low', 600), 3.0) * (0.75 + 0.25 * np.sin(2 * np.pi * tt(n) * 2 / bar_s)) * adsr(n, 0.05, 0.1, 0.9, 0.2)
+                pads.add(t0, x, 0.5, 0.34)
+            elif kind == '808':   # long distorted sub with pitch glides
+                for s, ln in ((0, 6), (6, 4), (10, 6)):
+                    n = int(step_n * ln * 1.2); tg = tt(n); fq = hz(scale[deg] - 24 + (0 if s != 10 else int(rng.choice([0, 3, -2]))))
+                    fr = fq * (1 + 1.4 * np.exp(-tg * 28)) * (1 if rng.random() < 0.6 else 0.5 + 0.5 * np.exp(-tg * 3))
+                    x = distort(np.sin(2 * np.pi * np.cumsum(fr) / SR) * 1.8, 1.8) * np.exp(-tg * 1.6) * adsr(n, 0.002, 0.05, 1.0, 0.05)
+                    pads.add(t0 + int(s * step_n), x, 0.5, 0.5)
+            elif kind == 'wobble':  # LFO-swept distorted saw bass
+                n = int(bar_n / 2)
+                for half in (0, 1):
+                    fq = hz(scale[deg] - 24 + (0 if half == 0 else int(rng.choice([0, 0, 3, 5]))))
+                    x = saw(fq, n) + 0.7 * saw(fq * 1.006, n, 0.4) + 0.7 * saw(fq * 0.994, n, 0.7)
+                    lfo = 0.5 + 0.5 * np.sin(2 * np.pi * tt(n) * (bpm / 60) * rng.choice([1, 2, 3]) - np.pi / 2)
+                    x = distort(sos_f(x, 'low', 250) * (1 - lfo) + sos_f(x, 'low', 3200) * lfo, 3.0) * adsr(n, 0.003, 0.05, 0.9, 0.03)
+                    pads.add(t0 + half * n, x, 0.5, 0.33)
+            elif kind == 'whole':
                 n = int(bar_n); x = (np.sin(2 * np.pi * f * tt(n)) + 0.3 * saw(f, n)) * adsr(n, 0.02, 0.1, 0.85, 0.2)
                 pads.add(t0, sos_f(x, 'low', 400), 0.5, 0.45)
             else:
@@ -213,6 +292,21 @@ def make_track(dur, style, key, seed):
                     n = int(step_n * (3 if kind in ('syncop', 'pulse') else 1.7))
                     x = (np.sin(2 * np.pi * f * tt(n)) + 0.35 * saw(f, n)) * adsr(n, 0.005, 0.05, 0.6, 0.06)
                     pads.add(t0 + int(s * step_n), sos_f(x, 'low', 500), 0.5, 0.42)
+        # --- distorted guitar riff
+        if S.get('riff') and (inten >= 0.3 or True) and not last:
+            gd = S['drive']
+            if S['riff'] == 'chug':
+                pat, off = pats[(b // 2) % 4], offs[(b // 2) % 4]
+                steps = [(s, 0.9, True) for s in pat] + [(0, 2.0, False)]
+            else:
+                pat, off = list(range(0, 16, 2)), offs[(b // 2) % 4]
+                steps = [(s, 1.9, s % 8 != 0) for s in pat]
+            for s, ln, mute in steps:
+                n = int(step_n * ln * (1.0 if mute else 1.6)); m0 = scale[deg] - 12 + off[s]
+                x = sum(saw(hz(m0 + o), n, rng.random()) for o in (0, 7, 12, 12)) / 4
+                x = sos_f(distort(sos_f(x, 'low', 3500) * 2, gd), 'band', [90, 4800])
+                x *= adsr(n, 0.002, 0.04 if mute else 0.15, 0.25 if mute else 0.7, 0.03) * np.exp(-tt(n) * (14 if mute else 2))
+                dry.add(t0 + int(s * step_n), x, 0.25 if (s // 2) % 2 == 0 else 0.75, 0.30 * (1.0 if s == 0 else 0.85))
         # --- drums
         dm = S['drums']
         if last:
@@ -224,7 +318,14 @@ def make_track(dur, style, key, seed):
                  'halftime': dict(k=[0, 10], sn=[8], h=list(range(0, 16, 2)), hc=[]),
                  'lofi': dict(k=[0, 7, 10], sn=[4, 12], h=list(range(0, 16, 2)), hc=[]),
                  'cinematic': dict(k=[0], sn=[], h=[], hc=[], tm=[0, 6, 10], tl=[8]),
-                 'sparse': dict(k=[0], sn=[], h=[4, 12], hc=[])}[dm]
+                 'sparse': dict(k=[0], sn=[], h=[4, 12], hc=[]),
+                 'metal': dict(k=[0, 2, 6, 8, 10, 14] if inten < 0.8 else list(range(0, 16, 2)), sn=[4, 12],
+                               h=list(range(0, 16, 2)), hc=[], cl=[]),
+                 'rock': dict(k=[0, 8, 10], sn=[4, 12], h=list(range(0, 16, 2)), hc=[], cl=[]),
+                 'phonk': dict(k=[0, 6, 10], sn=[8], h=list(range(0, 16)), hc=[], cl=[]),
+                 'dub': dict(k=[0, 10], sn=[8], h=[2, 6, 10, 14], hc=[], cl=[6, 14]),
+                 'ind4': dict(k=[0, 4, 8, 12], sn=[4, 12], h=[2, 6, 10, 14], hc=[1, 3, 5, 7, 9, 11, 13, 15], cl=[6, 14, 11]),
+                 'indhalf': dict(k=[0, 10], sn=[8], h=[2, 6, 10, 14], hc=[], cl=[3, 13, 15])}[dm]
             swing = 0.12 if dm == 'lofi' else 0.0
             for s in P['k']:
                 p = t0 + int(s * step_n); dry.add(p, one['kick'], 0.5, 0.75 if dm != 'cinematic' else 0.9); kicks.append(p)
@@ -236,20 +337,32 @@ def make_track(dur, style, key, seed):
                     dry.add(t0 + int((s + (swing if s % 2 else 0)) * step_n), one['hat'], 0.65, 0.5 * inten)
                 for s in P['hc']:
                     if s % 4: dry.add(t0 + int(s * step_n), one['hat'], 0.4, 0.3 * inten)
+            if S.get('crash') and b % 4 == 0:
+                dry.add(t0, one['crash'], 0.5, 0.45)
+            if dm == 'phonk' and b % 2 == 1:
+                for q in range(6):
+                    dry.add(t0 + int((14 + q / 3) * step_n), one['hat'], 0.6, 0.5)
+            if S.get('ind') and inten >= 0.5:
+                for j, s in enumerate(P.get('cl', [])):
+                    if rng.random() < 0.8:
+                        p = t0 + int(s * step_n)
+                        dry.add(p, clangs[(b + j) % 4], 0.3 + 0.4 * ((b + j) % 2), 0.55 * inten); send.add(p, clangs[(b + j) % 4], 0.5, 0.3)
             for s in P.get('tm', []):
                 dry.add(t0 + int(s * step_n), one['tom'], 0.4, 0.6 * inten)
             for s in P.get('tl', []):
                 dry.add(t0 + int(s * step_n), one['tomlo'], 0.6, 0.7 * inten)
         # --- arp / pluck pattern
         if S['arp'] and inten >= 0.35 and not last:
-            rate = {'pluck16': 1, 'pluck8': 2, 'tick': 4}[S['arp']]
+            rate = {'pluck16': 1, 'pluck8': 2, 'tick': 4, 'mech': 1}[S['arp']]
             idx = [0, 1, 2, 3, 2, 1, 2, 3] if b % 2 == 0 else [2, 3, 1, 3, 0, 2, 1, 3]
             ext = notes + [notes[0] + 12, notes[1] + 12]
             for j, s in enumerate(range(0, 16, rate)):
                 m = ext[idx[j % 8] % len(ext)] + (12 if S['arp'] != 'tick' else 24)
                 if S['arp'] == 'tick' and rng.random() > 0.5: continue
+                if S['arp'] == 'mech' and rng.random() < 0.45: continue
                 n = int(step_n * rate * 1.6)
                 x = pluck(hz(m), n, rng) * (0.14 + 0.1 * inten)
+                if S['arp'] == 'mech': x = distort(x * 4, 2.5) * 0.55
                 pads.add(t0 + int(s * step_n), x, 0.3 + 0.4 * ((j * 7) % 3) / 2, 1.0)
                 send.add(t0 + int(s * step_n), x, 0.5, 0.35)
         # --- electric piano chords (chill)
@@ -272,6 +385,13 @@ def make_track(dur, style, key, seed):
                     x = sos_f(supersaw(hz(m), n, rng, 0.006, 3), 'low', 2600) * adsr(n, 0.02, 0.1, 0.7, 0.25) * 0.16
                 elif S['lead'] == 'ep':
                     x = ep_note(hz(m), n) * 0.11
+                elif S['lead'] == 'cowbell':
+                    f0 = hz(m + 12); tc = tt(n)
+                    x = (np.sign(np.sin(2 * np.pi * f0 * tc)) + np.sign(np.sin(2 * np.pi * f0 * 1.4983 * tc))) * np.exp(-tc * 11)
+                    x = distort(sos_f(x, 'band', [450, 4500]), 1.6) * 0.14
+                elif S['lead'] == 'screech':  # harsh distorted saw lead
+                    x = supersaw(hz(m), n, rng, 0.012, 3)
+                    x = distort(sos_f(x, 'band', [hz(m) * 1.5, 4200]) * 3, 3.0) * adsr(n, 0.005, 0.08, 0.6, 0.12) * 0.17
                 else:
                     x = pluck(hz(m), n, rng, 5000) * 0.2
                 dry.add(t0 + int(j * 2 * step_n), x, 0.55, 1.0); send.add(t0 + int(j * 2 * step_n), x, 0.5, 0.4)
@@ -304,8 +424,9 @@ def make_track(dur, style, key, seed):
         mix += sos_f(rng.standard_normal(N), 'band', [1000, 6000]) * 0.003 + crackle
     mix = sos_f(mix, 'high', 30)
     mix = mix[:, :int(dur * SR)]
-    mix *= 0.13 / (np.sqrt(np.mean(mix ** 2)) + 1e-9)       # about -17 dB RMS (like the narration)
-    mix = np.tanh(mix * 1.4) / np.tanh(1.4) * 0.97            # soft limiter
+    mix *= S.get('rms', 0.13) / (np.sqrt(np.mean(mix ** 2)) + 1e-9)
+    sat = S.get('sat', 1.4)
+    mix = np.tanh(mix * sat) / np.tanh(sat) * 0.97            # soft limiter
     return mix, bpm, B
 
 

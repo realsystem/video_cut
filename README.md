@@ -10,7 +10,8 @@ Built on Windows 10 (PowerShell) with ffmpeg, Python 3.15.
 1. download   python -m yt_dlp -f "bv*+ba/b" --merge-output-format mkv -o "source_best.%(ext)s" <URL>
 2. scene cuts ffmpeg -i source_best.mkv -vf "select='gt(scene,0.25)',showinfo" -an -f null -
               (pts_time values -> clips.json "scene_cuts"; pick clips between cuts)
-3. music      python scripts/musicgen.py clips.json MUSIC_DIR   -> one original track PER clip
+3. music      python scripts/fit_music.py clips.json TRACKS_DIR SHORTS_DIR OUT_DIR  -> real tracks you chose,
+              beat-fitted to each clip's scene cuts (recommended; see Music below)
 4. track      python scripts/track.py source_best.mkv clips.json CMD_DIR
 5. render     python scripts/render.py source_best.mkv clips.json CMD_DIR MUSIC_DIR OUT_DIR
 6. check      python scripts/check.py OUT_DIR
@@ -45,6 +46,22 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, `pip install yt-dlp[default] pip-syste
   royalty-free files if wanted. To change only the music of rendered shorts (no video re-encode):
   `python scripts/remux_audio.py clips.json SHORTS_DIR MUSIC_DIR OUT_DIR [GAIN_DB]`.
 - Music was judged by measurement only (levels, loudness arc, spectrum), not by ear: listen to it.
+
+## Music: what worked and what didn't (listening verdict from the channel owner)
+
+- `musicgen.py` (numpy synth, styles epic/driving/tense/uplift/chill/trailer + industrial/metal/rock/phonk/
+  wobble): rejected: "ancient synthesizer", no real bass, all tracks sound alike, unrelated to the picture.
+  Fine as a placeholder generator, not for publishing.
+- `stable_audio.py` (Stable Audio Open 1.0 on CPU, ~12 min/clip): rejected: generic/ambient, unrelated
+  to hard off-road content; also fades out near the end of each generation and has a restrictive license.
+- ACE-Step 1.5 (MIT, 4B/2B on CPU) was never tested: the Claude Code memory guard killed it while
+  loading/sampling on a 32 GB machine (CPU runs fp32). Needs a real GPU. `acestep_gen.py`/`tsrun.py` are not
+  in the repo for that reason.
+- Genre research (blogs, weak evidence): rock/hard rock/metal for rock crawling; phonk trending for car edits.
+- **Recommended:** pick real royalty-free tracks by ear, then `fit_music.py`: detects tempo + beat grid
+  (verified exact on synthetic tracks with known bpm), chooses a loud section, stretches speed by <= 6%
+  (pitch preserved) so beats land on the clip's inner scene cuts, loudness-normalises, fades out and muxes
+  onto the existing video without re-encoding. Assumes constant tempo; check the printed cut->beat error.
 - QA: `check.py` is numeric only (scene cuts at clip edges, vehicle presence, edge-touch,
   audio levels) so no frames need to be looked at manually.
 
